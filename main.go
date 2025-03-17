@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	addr := ":8080"
+	addr := ":8081"
 	if err := StartServer(addr); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
