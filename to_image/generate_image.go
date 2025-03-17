@@ -4,16 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/unidoc/unipdf/v3/model"
-	"github.com/unidoc/unipdf/v3/render"
+	"golang.org/x/image/draw"
 	"image"
-	"image/draw"
+	"image/jpeg"
 	"log"
 	"main/to_pdf"
 	"sync"
 	"time"
 
-	"github.com/sunshineplan/imgconv"
+	"github.com/gen2brain/go-fitz" // Replace unipdf with go-fitz
 	"main/data"
 )
 
@@ -99,23 +98,25 @@ func MergeImages(ctx context.Context, idCardsResp data.IdCardsResponseSchema) (*
 	defer bufPool.Put(buf)
 	buf.Reset()
 
-	// using JPEG due to lower memory footprint
-	if err := imgconv.Write(buf, mergedImg, &imgconv.FormatOption{Format: imgconv.JPEG}); err != nil {
+	// Use JPEG encoding for lower memory footprint
+	if err := jpeg.Encode(buf, mergedImg, &jpeg.Options{Quality: 90}); err != nil {
 		return nil, fmt.Errorf("failed to encode merged image: %w", err)
 	}
 
-	fileName := fmt.Sprintf("id_cards_%s.png", time.Now().Format("20060102_150405"))
+	fileName := fmt.Sprintf("id_cards_%s.jpg", time.Now().Format("20060102_150405"))
 	return &GenerateImageResponse{
 		ImageContent: buf.Bytes(),
 		FileName:     fileName,
 	}, nil
 }
 
+// Updated to use standard library draw package for better performance
 func mergeImagesVertically(images []image.Image) (image.Image, error) {
 	if len(images) == 0 {
 		return nil, fmt.Errorf("no images to merge")
 	}
 
+	// Calculate dimensions for the composite image
 	cardWidth := 1012
 	cardHeight := 638
 	margin := 30
@@ -123,8 +124,11 @@ func mergeImagesVertically(images []image.Image) (image.Image, error) {
 
 	totalHeight := (cardHeight * len(images)) + (margin * (len(images) - 1)) + (sideMargin * 2)
 	totalWidth := cardWidth + (sideMargin * 2)
+
+	// Create the destination image
 	mergedImg := image.NewRGBA(image.Rect(0, 0, totalWidth, totalHeight))
 
+	// Fill with white background
 	draw.Draw(mergedImg, mergedImg.Bounds(), image.White, image.Point{}, draw.Src)
 
 	currentY := sideMargin
@@ -133,6 +137,7 @@ func mergeImagesVertically(images []image.Image) (image.Image, error) {
 		origWidth := bounds.Dx()
 		origHeight := bounds.Dy()
 
+		// Calculate scaling
 		widthRatio := float64(cardWidth) / float64(origWidth)
 		heightRatio := float64(cardHeight) / float64(origHeight)
 		ratio := widthRatio
@@ -143,21 +148,25 @@ func mergeImagesVertically(images []image.Image) (image.Image, error) {
 		newWidth := int(float64(origWidth) * ratio)
 		newHeight := int(float64(origHeight) * ratio)
 
-		resizedImg := imgconv.Resize(img, &imgconv.ResizeOption{
-			Width:  newWidth,
-			Height: newHeight,
-		})
-
+		// Create appropriately sized rectangle
 		xPos := sideMargin + ((cardWidth - newWidth) / 2)
 		yPos := currentY + ((cardHeight - newHeight) / 2)
 
-		draw.Draw(mergedImg, image.Rect(xPos, yPos, xPos+newWidth, yPos+newHeight), resizedImg, bounds.Min, draw.Over)
+		// Use standard library's draw - more efficient than imgconv
+		draw.NearestNeighbor.Scale(
+			mergedImg,
+			image.Rect(xPos, yPos, xPos+newWidth, yPos+newHeight),
+			img,
+			img.Bounds(),
+			draw.Over,
+			nil,
+		)
+
 		currentY += cardHeight + margin
 	}
 	return mergedImg, nil
 }
 
-// Parallelize PDF generation in ConvertHTMLCardsToImage
 func ConvertHTMLCardsToImage(ctx context.Context, htmlCards []data.IdCard) ([]image.Image, error) {
 	numWorkers := 4
 	cardCh := make(chan data.IdCard, len(htmlCards))
@@ -205,20 +214,22 @@ func ConvertHTMLCardsToImage(ctx context.Context, htmlCards []data.IdCard) ([]im
 	return images, nil
 }
 
+// Replace unipdf with go-fitz (MuPDF) for PDF to image conversion
 func convertPDFToImage(pdfBytes []byte) (image.Image, error) {
-	log.Printf("Converting PDF to image using unipdf library")
-	pdfReader, err := model.NewPdfReader(bytes.NewReader(pdfBytes))
+	log.Printf("Converting PDF to image using go-fitz library")
+
+	// Use NewFromMemory to avoid filesystem I/O
+	doc, err := fitz.NewFromMemory(pdfBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create PDF reader: %w", err)
+		return nil, fmt.Errorf("failed to open PDF: %w", err)
 	}
-	page, err := pdfReader.GetPage(1)
+	defer doc.Close()
+
+	// Convert the first page to an image
+	img, err := doc.Image(0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get PDF page: %w", err)
+		return nil, fmt.Errorf("failed to convert PDF page to image: %w", err)
 	}
-	device := render.NewImageDevice()
-	img, err := device.Render(page)
-	if err != nil {
-		return nil, fmt.Errorf("failed to render PDF page to image: %w", err)
-	}
+
 	return img, nil
 }

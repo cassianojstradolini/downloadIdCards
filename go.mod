@@ -4,6 +4,10 @@ go 1.24
 
 require (
 	github.com/SebastiaanKlippert/go-wkhtmltopdf v1.9.3
+	github.com/chromedp/cdproto v0.0.0-20250311215558-29dfcc2791de
+	github.com/chromedp/chromedp v0.13.1
+	github.com/disintegration/imaging v1.6.2
+	github.com/gen2brain/go-fitz v1.24.14
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/sunshineplan/imgconv v1.1.14
 	github.com/unidoc/unipdf/v3 v3.67.0
@@ -14,11 +18,18 @@ require (
 	github.com/adrg/strutil v0.3.1 // indirect
 	github.com/adrg/sysfont v0.1.2 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
+	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/ebitengine/purego v0.8.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
+	github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535 // indirect
+	github.com/gobwas/httphead v0.1.0 // indirect
+	github.com/gobwas/pool v0.2.1 // indirect
+	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/gorilla/i18n v0.0.0-20150820051429-8b358169da46 // indirect
 	github.com/hhrutter/lzw v1.0.0 // indirect
 	github.com/hhrutter/tiff v1.0.1 // indirect
+	github.com/jupiterrider/ffi v0.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/pdfcpu/pdfcpu v0.5.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
